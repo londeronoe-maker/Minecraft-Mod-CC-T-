@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC:T NETWORK — Monitor</title>
+<style>
+  :root {
+    --bg:      #0a1929;      /* bleu nuit très sombre */
+    --panel:   #0f2137;      /* panneau */
+    --panel-2: #12283f;
+    --edge:    #1e3a5f;      /* bordures */
+    --blue:    #4da3ff;      /* bleu CC:T */
+    --blue-dim:#2b6cb0;
+    --white:   #eaf2fb;      /* texte blanc bleuté */
+    --dim:     #7fa8d0;      /* texte secondaire */
+    --ok:      #4da3ff;
+    --off:     #5a6b7d;
+    --warn:    #ffcf6b;
+    --bad:     #ff7a7a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: "Consolas", "DejaVu Sans Mono", "Courier New", monospace;
+    font-size: 14px;
+    min-height: 100vh;
+    /* léger effet scanline CRT */
+    background-image: repeating-linear-gradient(
+      0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px,
+      transparent 1px, transparent 3px);
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  /* -------- En-tête -------- */
+  header {
+    border: 1px solid var(--edge);
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    padding: 14px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .title {
+    font-size: 18px; letter-spacing: 2px; color: var(--blue);
+    text-shadow: 0 0 8px rgba(77,163,255,0.5);
+  }
+  .title .cursor {
+    display: inline-block; width: 9px; height: 16px; margin-left: 4px;
+    background: var(--blue); vertical-align: middle;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .stat-line { color: var(--dim); font-size: 12px; }
+  .stat-line b { color: var(--white); }
+
+  /* -------- Barre méta -------- */
+  .meta {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    border: 1px solid var(--edge); border-top: none;
+    background: var(--panel);
+    padding: 8px 18px; font-size: 12px; color: var(--dim);
+  }
+  .meta .dot { color: var(--ok); }
+
+  /* -------- Grille de cartes -------- */
+  .grid {
+    margin-top: 18px;
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+  .card {
+    border: 1px solid var(--edge);
+    background: var(--panel);
+    padding: 0; overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.3) inset;
+  }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; background: var(--panel-2);
+    border-bottom: 1px solid var(--edge);
+  }
+  .card-head .name { color: var(--blue); font-weight: bold; letter-spacing: 1px; }
+  .card-head .id   { color: var(--off); font-size: 11px; }
+  .badge {
+    font-size: 11px; padding: 2px 8px; border: 1px solid;
+    letter-spacing: 1px;
+  }
+  .badge.on  { color: var(--ok);  border-color: var(--blue-dim); background: rgba(77,163,255,0.08); }
+  .badge.off { color: var(--off); border-color: #33404d; }
+
+  .card-body { padding: 12px; }
+  .row {
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 3px 0; border-bottom: 1px dotted #1a3049;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .k { color: var(--dim); }
+  .row .v { color: var(--white); text-align: right; }
+  .v.status-mining { color: var(--ok); }
+  .v.status-idle   { color: var(--dim); }
+  .v.status-warn   { color: var(--warn); }
+
+  /* barre de fuel */
+  .fuel-bar {
+    margin-top: 3px; height: 8px; background: #0a1a2c;
+    border: 1px solid var(--edge); position: relative; overflow: hidden;
+  }
+  .fuel-fill {
+    height: 100%; background: linear-gradient(90deg, var(--blue-dim), var(--blue));
+    box-shadow: 0 0 6px rgba(77,163,255,0.6);
+    transition: width 0.4s ease;
+  }
+  .fuel-fill.low { background: linear-gradient(90deg,#a04a4a,var(--bad)); box-shadow:0 0 6px rgba(255,122,122,0.5); }
+
+  /* inventaire mini-grille */
+  .inv {
+    margin-top: 8px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px;
+  }
+  .slot {
+    aspect-ratio: 1; border: 1px solid var(--edge); background: #0a1a2c;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--dim); position: relative;
+  }
+  .slot.filled { border-color: var(--blue-dim); background: rgba(77,163,255,0.10); color: var(--white); }
+  .slot .cnt { position: absolute; bottom: 1px; right: 2px; font-size: 9px; color: var(--blue); }
+
+  .empty-state {
+    border: 1px dashed var(--edge); padding: 40px; text-align: center;
+    color: var(--dim); margin-top: 18px;
+  }
+  .empty-state .big { color: var(--blue); font-size: 16px; letter-spacing: 2px; }
+
+  footer { margin-top: 24px; color: var(--off); font-size: 11px; text-align: center; }
+  a { color: var(--blue); }
+
+  /* champ config */
+  .cfg { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .cfg input {
+    background: #0a1a2c; border: 1px solid var(--edge); color: var(--white);
+    font-family: inherit; font-size: 12px; padding: 5px 8px; width: 320px;
+  }
+  .cfg button {
+    background: var(--blue-dim); border: 1px solid var(--blue); color: var(--white);
+    font-family: inherit; font-size: 12px; padding: 5px 12px; cursor: pointer;
+  }
+  .cfg button:hover { background: var(--blue); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="title">CC:T NETWORK MONITOR<span class="cursor"></span></div>
+      <div class="stat-line">réseau ComputerCraft — <b id="worldName">monde local</b></div>
+    </div>
+    <div class="stat-line" style="text-align:right;">
+      <div>uptime moniteur : <b id="uptime">00:00</b></div>
+      <div>dernière synchro : <b id="lastSync">—</b></div>
+    </div>
+  </header>
+
+  <div class="meta">
+    <span><span class="dot">●</span> en ligne : <b id="cntOn">0</b></span>
+    <span>hors ligne : <b id="cntOff">0</b></span>
+    <span>total : <b id="cntTotal">0</b></span>
+    <span style="margin-left:auto;" class="cfg">
+      <input id="apiUrl" placeholder="https://ton-app.onrender.com" />
+      <button onclick="saveUrl()">connecter</button>
+    </span>
+  </div>
+
+  <div id="grid" class="grid"></div>
+  <div id="empty" class="empty-state" style="display:none;">
+    <div class="big">AUCUN COMPUTER DÉTECTÉ</div>
+    <div style="margin-top:8px;">Lance <code>agent</code> sur un computer et vérifie l'URL de l'API ci-dessus.</div>
+  </div>
+
+  <footer>
+    CC:T NETWORK MONITOR &middot; rafraîchissement auto toutes les 3s &middot;
+    données servies par l'API Render
+  </footer>
+</div>
+
+<script>
+  // ---- Config : base URL de l'API ----
+  // URL Render integree en dur (valeur par defaut). Le champ en haut a droite
+  // permet quand meme de la changer ; le choix manuel est prioritaire s'il existe.
+  const DEFAULT_API = "https://candidature-bot-5ih5.onrender.com";
+  const LS_KEY = "cc_api_base";
+  let API_BASE = localStorage.getItem(LS_KEY) || DEFAULT_API;
+
+  const $ = (id) => document.getElementById(id);
+
+  function saveUrl() {
+    let v = $("apiUrl").value.trim().replace(/\/+$/, "");
+    API_BASE = v;
+    localStorage.setItem(LS_KEY, v);
+    fetchData();
+  }
+
+  $("apiUrl").value = API_BASE;
+
+  // ---- Uptime moniteur ----
+  const startTime = Date.now();
+  function tickUptime() {
+    const s = Math.floor((Date.now() - startTime) / 1000);
+    const m = String(Math.floor(s / 60)).padStart(2, "0");
+    const ss = String(s % 60).padStart(2, "0");
+    $("uptime").textContent = m + ":" + ss;
+  }
+  setInterval(tickUptime, 1000);
+
+  // ---- Rendu d'une carte ----
+  function renderCard(c) {
+    const online = c.online;
+    const fuelKnown = c.fuel !== null && c.fuel !== undefined;
+    let fuelTxt, fuelPct = 0, low = false;
+    if (c.fuel === "unlimited") { fuelTxt = "∞"; fuelPct = 100; }
+    else if (fuelKnown) {
+      fuelTxt = Number(c.fuel).toLocaleString("fr-FR");
+      // barre : échelle sur 5120 (1 stack de charbon) plafonnée à 100%
+      fuelPct = Math.max(0, Math.min(100, (Number(c.fuel) / 5120) * 100));
+      low = Number(c.fuel) < 200;
+    } else { fuelTxt = "—"; }
+
+    const pos = c.pos ? `${c.pos.x}, ${c.pos.y}, ${c.pos.z}` : "—";
+
+    // statut coloré
+    let scls = "status-idle";
+    const st = (c.status || "idle").toLowerCase();
+    if (st.includes("min")) scls = "status-mining";
+    else if (st.includes("warn") || st.includes("stuck") || st.includes("bloq")) scls = "status-warn";
+
+    // inventaire (turtles seulement)
+    let invHtml = "";
+    if (c.type === "turtle") {
+      const map = {};
+      (c.inventory || []).forEach(it => map[it.slot] = it);
+      let slots = "";
+      for (let i = 1; i <= 16; i++) {
+        const it = map[i];
+        if (it) {
+          const short = it.name.split(":").pop().slice(0, 3);
+          slots += `<div class="slot filled" title="${it.name} ×${it.count}">${short}<span class="cnt">${it.count}</span></div>`;
+        } else {
+          slots += `<div class="slot"></div>`;
+        }
+      }
+      invHtml = `<div class="inv">${slots}</div>`;
+    }
+
+    return `
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <span class="name">${escapeHtml(c.label)}</span>
+            <span class="id"> #${c.id}</span>
+          </div>
+          <span class="badge ${online ? "on" : "off"}">${online ? "ONLINE" : "OFFLINE"}</span>
+        </div>
+        <div class="card-body">
+          <div class="row"><span class="k">type</span><span class="v">${c.type}</span></div>
+          <div class="row"><span class="k">statut</span><span class="v ${scls}">${escapeHtml(c.status || "idle")}</span></div>
+          ${c.detail ? `<div class="row"><span class="k">detail</span><span class="v">${escapeHtml(c.detail)}</span></div>` : ""}
+          <div class="row"><span class="k">position</span><span class="v">${pos}</span></div>
+          <div class="row">
+            <span class="k">fuel</span>
+            <span class="v">${fuelTxt}</span>
+          </div>
+          <div class="fuel-bar"><div class="fuel-fill ${low ? "low" : ""}" style="width:${fuelPct}%"></div></div>
+          ${invHtml}
+        </div>
+      </div>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, m =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  }
+
+  // ---- Récupération des données ----
+  async function fetchData() {
+    if (!API_BASE) { showEmpty(true); return; }
+    try {
+      const r = await fetch(API_BASE + "/cc/computers", { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
+      const list = data.computers || [];
+
+      const on = list.filter(c => c.online).length;
+      $("cntOn").textContent = on;
+      $("cntOff").textContent = list.length - on;
+      $("cntTotal").textContent = list.length;
+      $("lastSync").textContent = new Date().toLocaleTimeString("fr-FR");
+
+      if (list.length === 0) { showEmpty(true); return; }
+      showEmpty(false);
+      $("grid").innerHTML = list.map(renderCard).join("");
+    } catch (e) {
+      $("lastSync").textContent = "erreur: " + e.message;
+      // on n'efface pas l'affichage précédent, on garde la dernière vue
+    }
+  }
+
+  function showEmpty(v) {
+    $("empty").style.display = v ? "block" : "none";
+    $("grid").style.display = v ? "none" : "grid";
+  }
+
+  // ---- Boucle ----
+  fetchData();
+  setInterval(fetchData, 3000);
+</script>
+</body>
+</html>
