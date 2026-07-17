@@ -219,13 +219,24 @@
   }
   window.sendCommand = sendCommand;
 
-  // Bouton "miner zone" : demande les coords sans casser l'affichage
+  // Bouton "miner zone" : demande la zone puis un depart optionnel
   window.mineZone = function (id) {
-    const v = prompt("Coordonnees du coin oppose (X Y Z) :", "0 -20 0");
-    if (!v) return;
-    const p = v.trim().split(/\s+/).map(Number);
-    if (p.length !== 3 || p.some(isNaN)) { toast("coords invalides"); return; }
-    sendCommand(id, "mine", { x: p[0], y: p[1], z: p[2] });
+    const zone = prompt("ZONE a miner - coin oppose (X Y Z) :", "0 -20 0");
+    if (!zone) return;
+    const z = zone.trim().split(/\s+/).map(Number);
+    if (z.length !== 3 || z.some(isNaN)) { toast("coords zone invalides"); return; }
+
+    const extra = { x: z[0], y: z[1], z: z[2] };
+
+    const start = prompt(
+      "Position de DEPART de la turtle (X Y Z)\n"
+      + "Laisse VIDE pour utiliser le GPS automatiquement :", "");
+    if (start && start.trim() !== "") {
+      const s = start.trim().split(/\s+/).map(Number);
+      if (s.length !== 3 || s.some(isNaN)) { toast("depart invalide"); return; }
+      extra.sx = s[0]; extra.sy = s[1]; extra.sz = s[2];
+    }
+    sendCommand(id, "mine", extra);
   };
 
   // petit message temporaire en bas de l'ecran
