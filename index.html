@@ -180,10 +180,7 @@
     <span><span class="dot">●</span> en ligne : <b id="cntOn">0</b></span>
     <span>hors ligne : <b id="cntOff">0</b></span>
     <span>total : <b id="cntTotal">0</b></span>
-    <span style="margin-left:auto;" class="cfg">
-      <input id="apiUrl" placeholder="https://ton-app.onrender.com" />
-      <button onclick="saveUrl()">connecter</button>
-    </span>
+    <span style="margin-left:auto;" class="stat-line">API : <b>candidature-bot-5ih5.onrender.com</b></span>
   </div>
 
   <div id="grid" class="grid"></div>
@@ -199,12 +196,8 @@
 </div>
 
 <script>
-  // ---- Config : base URL de l'API ----
-  // URL Render integree en dur (valeur par defaut). Le champ en haut a droite
-  // permet quand meme de la changer ; le choix manuel est prioritaire s'il existe.
-  const DEFAULT_API = "https://candidature-bot-5ih5.onrender.com";
-  const LS_KEY = "cc_api_base";
-  let API_BASE = localStorage.getItem(LS_KEY) || DEFAULT_API;
+  // ---- Config : URL de l'API (Render, en dur) ----
+  const API_BASE = "https://candidature-bot-5ih5.onrender.com";
 
   // Token pour envoyer des ordres (monde solo : en dur, pas de protection).
   const CC_TOKEN = "wolfpack104";
@@ -254,15 +247,6 @@
   }
 
   const $ = (id) => document.getElementById(id);
-
-  function saveUrl() {
-    let v = $("apiUrl").value.trim().replace(/\/+$/, "");
-    API_BASE = v;
-    localStorage.setItem(LS_KEY, v);
-    fetchData();
-  }
-
-  $("apiUrl").value = API_BASE;
 
   // ---- Uptime moniteur ----
   const startTime = Date.now();
