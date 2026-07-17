@@ -137,6 +137,20 @@
 
   /* champ config */
   .cfg { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* boutons de controle sur les cartes */
+  .ctrl {
+    margin-top: 10px; display: flex; flex-wrap: wrap; gap: 5px;
+    border-top: 1px solid var(--edge); padding-top: 10px;
+  }
+  .btn {
+    background: #0a1a2c; border: 1px solid var(--blue-dim); color: var(--white);
+    font-family: inherit; font-size: 11px; padding: 4px 9px; cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+  .btn:hover { background: var(--blue-dim); }
+  .btn-go { border-color: var(--blue); color: var(--blue); font-weight: bold; }
+  .btn-go:hover { background: var(--blue); color: #06121f; }
   .cfg input {
     background: #0a1a2c; border: 1px solid var(--edge); color: var(--white);
     font-family: inherit; font-size: 12px; padding: 5px 8px; width: 320px;
@@ -191,6 +205,53 @@
   const DEFAULT_API = "https://candidature-bot-5ih5.onrender.com";
   const LS_KEY = "cc_api_base";
   let API_BASE = localStorage.getItem(LS_KEY) || DEFAULT_API;
+
+  // Token pour envoyer des ordres (monde solo : en dur, pas de protection).
+  const CC_TOKEN = "wolfpack104";
+
+  // Envoie un ordre a une turtle
+  async function sendCommand(id, action, extra) {
+    if (!API_BASE) return;
+    try {
+      const payload = Object.assign({ token: CC_TOKEN, id: id, action: action }, extra || {});
+      const r = await fetch(API_BASE + "/cc/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      toast(r.ok ? ("ordre envoye : " + action) : "echec ordre");
+    } catch (e) {
+      toast("erreur : " + e.message);
+    }
+  }
+  window.sendCommand = sendCommand;
+
+  // Bouton "miner zone" : demande les coords sans casser l'affichage
+  window.mineZone = function (id) {
+    const v = prompt("Coordonnees du coin oppose (X Y Z) :", "0 -20 0");
+    if (!v) return;
+    const p = v.trim().split(/\s+/).map(Number);
+    if (p.length !== 3 || p.some(isNaN)) { toast("coords invalides"); return; }
+    sendCommand(id, "mine", { x: p[0], y: p[1], z: p[2] });
+  };
+
+  // petit message temporaire en bas de l'ecran
+  let toastTimer = null;
+  function toast(msg) {
+    let t = document.getElementById("toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "toast";
+      t.style.cssText = "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);"
+        + "background:#12283f;border:1px solid #4da3ff;color:#eaf2fb;padding:8px 16px;"
+        + "font-family:monospace;font-size:13px;z-index:99;box-shadow:0 0 12px rgba(77,163,255,0.4);";
+      document.body.appendChild(t);
+    }
+    t.textContent = "> " + msg;
+    t.style.display = "block";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.style.display = "none"; }, 2500);
+  }
 
   const $ = (id) => document.getElementById(id);
 
@@ -252,6 +313,20 @@
       invHtml = `<div class="inv">${slots}</div>`;
     }
 
+    // boutons de controle (turtles seulement)
+    let ctrlHtml = "";
+    if (c.type === "turtle") {
+      ctrlHtml = `
+        <div class="ctrl">
+          <button class="btn" onclick="sendCommand('${c.id}','refuel')">refuel</button>
+          <button class="btn" onclick="sendCommand('${c.id}','stop')">stop</button>
+          <button class="btn" onclick="sendCommand('${c.id}','resume')">reprendre</button>
+          <button class="btn" onclick="sendCommand('${c.id}','dump')">vider</button>
+          <button class="btn" onclick="sendCommand('${c.id}','return')">retour base</button>
+          <button class="btn btn-go" onclick="mineZone('${c.id}')">miner zone</button>
+        </div>`;
+    }
+
     return `
       <div class="card">
         <div class="card-head">
@@ -272,6 +347,7 @@
           </div>
           <div class="fuel-bar"><div class="fuel-fill ${low ? "low" : ""}" style="width:${fuelPct}%"></div></div>
           ${invHtml}
+          ${ctrlHtml}
         </div>
       </div>`;
   }
